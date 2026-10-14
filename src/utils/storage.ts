@@ -151,43 +151,54 @@ export function setAdminAuthenticated(val: boolean): void {
 }
 
 /**
- * Downloads image directly to the user's computer/phone
+ * Downloads image directly to user's computer/phone preserving exact resolution, ratio and original format
  */
 export async function downloadImage(imageUrl: string, suggestedFilename: string): Promise<boolean> {
   try {
-    const cleanFilename = (suggestedFilename || 'thumbnail')
-      .replace(/[^a-zA-Z0-9_\-\u0980-\u09FF]/g, '_')
-      .slice(0, 60) + '.jpg';
+    let ext = '.jpg';
+    if (imageUrl.startsWith('data:image/png')) ext = '.png';
+    else if (imageUrl.startsWith('data:image/webp')) ext = '.webp';
+    else if (imageUrl.startsWith('data:image/jpeg') || imageUrl.startsWith('data:image/jpg')) ext = '.jpg';
+    else if (imageUrl.includes('.png')) ext = '.png';
+    else if (imageUrl.includes('.webp')) ext = '.webp';
 
-    // If it's a data url or blob url
+    const cleanBaseName = (suggestedFilename || 'photo')
+      .replace(/[^a-zA-Z0-9_\-\u0980-\u09FF]/g, '_')
+      .slice(0, 60);
+
+    // If it's a data url or blob url, trigger direct download immediately
     if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
       const link = document.createElement('a');
       link.href = imageUrl;
-      link.download = cleanFilename;
+      link.download = `${cleanBaseName}${ext}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       return true;
     }
 
-    // Try fetching as blob to trigger direct attachment download
+    // Fetch original blob preserving exact bytes and dimensions
     const response = await fetch(imageUrl);
     const blob = await response.blob();
+    if (blob.type === 'image/png') ext = '.png';
+    else if (blob.type === 'image/webp') ext = '.webp';
+    else if (blob.type === 'image/jpeg') ext = '.jpg';
+
     const blobUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = blobUrl;
-    link.download = cleanFilename;
+    link.download = `${cleanBaseName}${ext}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(blobUrl);
     return true;
   } catch (error) {
-    console.warn('Direct blob fetch failed, falling back to direct anchor link download', error);
+    console.warn('Direct blob fetch failed, falling back to direct link download', error);
     try {
       const link = document.createElement('a');
       link.href = imageUrl;
-      link.download = (suggestedFilename || 'thumbnail') + '.jpg';
+      link.download = (suggestedFilename || 'photo') + '.jpg';
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();

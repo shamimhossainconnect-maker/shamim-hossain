@@ -2,7 +2,7 @@ import { Language } from '../types';
 
 export const translations = {
   bn: {
-    brandName: 'ThumbnailHub',
+    brandName: 'Shamim Hossain',
     brandTagline: 'থাম্বনেইল ও কনটেন্ট রিসোর্স পোর্টাল',
     userPanelTab: 'ইউজার প্যানেল (সবার জন্য)',
     adminPanelTab: 'অ্যাডমিন প্যানেল',
@@ -82,7 +82,7 @@ export const translations = {
     copies: 'কপি',
   },
   en: {
-    brandName: 'ThumbnailHub',
+    brandName: 'Shamim Hossain',
     brandTagline: 'Thumbnail & Content Resource Portal',
     userPanelTab: 'User Panel (Open to All)',
     adminPanelTab: 'Admin Panel',

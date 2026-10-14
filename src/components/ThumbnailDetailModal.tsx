@@ -6,14 +6,10 @@ import {
   Copy, 
   Check, 
   X, 
-  Maximize2, 
-  Share2, 
   Bookmark, 
-  FileText, 
-  Layers, 
-  Calendar, 
-  HardDrive,
-  Eye
+  Sparkles,
+  ShieldCheck,
+  Maximize2
 } from 'lucide-react';
 import { copyToClipboard, downloadImage } from '../utils/storage';
 
@@ -81,14 +77,19 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
 
   const handleDownload = async () => {
     setIsDownloading(true);
-    showToast(t.downloadStarted, 'info');
+    showToast(
+      language === 'bn' 
+        ? 'আসল রেজোলিউশন ও রেশিও অনুযায়ী ডাউনলোড শুরু হয়েছে...' 
+        : 'Downloading in original exact resolution and ratio...', 
+      'info'
+    );
     onIncrementDownload(item.id);
     await downloadImage(item.imageUrl, item.title);
     setIsDownloading(false);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
       <div 
         className="relative w-full max-w-4xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden my-auto"
         onClick={(e) => e.stopPropagation()}
@@ -98,7 +99,7 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <span className="font-semibold text-indigo-400">{item.category}</span>
             <span aria-hidden="true">·</span>
-            <span className="font-mono">{item.resolution}</span>
+            <span className="font-mono text-slate-200">{item.resolution}</span>
             <span aria-hidden="true">·</span>
             <span>{item.createdAt}</span>
           </div>
@@ -126,14 +127,21 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Image Display */}
-        <div className="relative aspect-video w-full bg-slate-950 group">
+        {/* Image Display (Preserves exact natural aspect ratio: 16:9, 1:1, 4:5, 9:16) */}
+        <div className="relative w-full min-h-[240px] max-h-[58vh] bg-slate-950 flex items-center justify-center p-3 group overflow-hidden">
           <img
             src={item.imageUrl}
             alt={item.title}
             referrerPolicy="no-referrer"
-            className="w-full h-full object-contain sm:object-cover"
+            className="max-h-[55vh] w-auto max-w-full object-contain rounded-lg shadow-lg"
           />
+
+          {/* Quick ratio guarantee badge */}
+          <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-950/80 backdrop-blur-md border border-slate-800 text-[11px] font-medium text-emerald-300">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{language === 'bn' ? 'আসল রেশিও ও সাইজ সংরক্ষিত' : 'Original Ratio Preserved'}</span>
+          </div>
+
           <div className="absolute bottom-4 right-4 flex items-center gap-2">
             <button
               type="button"
@@ -142,7 +150,7 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-xl shadow-indigo-600/30 transition-all active:scale-95"
             >
               <Download className="w-4 h-4" />
-              <span>{isDownloading ? 'ডাউনলোড হচ্ছে...' : t.downloadThumbnail}</span>
+              <span>{isDownloading ? 'ডাউনলোড হচ্ছে...' : `${t.downloadThumbnail} (${item.resolution})`}</span>
             </button>
           </div>
         </div>
@@ -255,10 +263,10 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
                 type="button"
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/25 transition-all"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/25 transition-all whitespace-nowrap"
               >
                 <Download className="w-4 h-4" />
-                <span>{t.downloadThumbnail}</span>
+                <span>{language === 'bn' ? 'আসল সাইজে ডাউনলোড' : 'Download Original Ratio'}</span>
               </button>
             </div>
           </div>

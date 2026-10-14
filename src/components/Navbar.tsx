@@ -31,7 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Zone 1: Brand Wordmark (Single line, no clutter) */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 shadow-md shadow-indigo-500/20 text-white font-bold text-lg">
-            TH
+            SH
           </div>
           <div className="flex flex-col">
             <span className="text-lg font-bold tracking-tight text-white whitespace-nowrap">

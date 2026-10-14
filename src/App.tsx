@@ -15,7 +15,6 @@ import { UserDashboard } from './components/UserDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminLoginGate } from './components/AdminLoginGate';
 import { Toast } from './components/Toast';
-import { Shield, Sparkles, Heart } from 'lucide-react';
 
 export default function App() {
   const [activePanel, setActivePanel] = useState<ActivePanel>('user');
@@ -155,51 +154,6 @@ export default function App() {
         totalItems={items.length}
       />
 
-      {/* Prominent Template Switcher Bar */}
-      <div className="border-b border-slate-800 bg-slate-900/70 backdrop-blur-md px-4 py-3">
-        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs text-slate-300">
-            <span className="font-semibold text-white">
-              {language === 'bn' ? 'ড্যাশবোর্ড টেমপ্লেট সুইচ করুন:' : 'Select Dashboard Template:'}
-            </span>
-            <span className="text-slate-500 hidden sm:inline">|</span>
-            <span className="text-slate-400 hidden sm:inline">
-              {activePanel === 'user'
-                ? (language === 'bn' ? 'বর্তমানে সক্রিয়: ইউজার প্যানেল (সবার জন্য উন্মুক্ত)' : 'Currently active: User Panel (Open to all)')
-                : (language === 'bn' ? 'বর্তমানে সক্রিয়: অ্যাডমিন প্যানেল' : 'Currently active: Admin Panel')}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
-            <button
-              type="button"
-              onClick={() => setActivePanel('user')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
-                activePanel === 'user'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-indigo-300" />
-              <span>{language === 'bn' ? 'টেমপ্লেট ১: ইউজার প্যানেল' : 'Template 1: User Panel'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActivePanel('admin')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all whitespace-nowrap ${
-                activePanel === 'admin'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              <Shield className="w-4 h-4 text-amber-300" />
-              <span>{language === 'bn' ? 'টেমপ্লেট ২: অ্যাডমিন প্যানেল' : 'Template 2: Admin Panel'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main View Router */}
       <main className="flex-1">
         {activePanel === 'user' ? (
@@ -242,7 +196,7 @@ export default function App() {
       <footer className="border-t border-slate-900 bg-slate-950 py-8 px-4 text-xs text-slate-500">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-400">ThumbnailHub</span>
+            <span className="font-semibold text-slate-400">Shamim Hossain</span>
             <span>·</span>
             <span>
               {language === 'bn' 
@@ -263,7 +217,7 @@ export default function App() {
             </button>
             <span>·</span>
             <span className="text-slate-600">
-              © {new Date().getFullYear()} ThumbnailHub
+              © {new Date().getFullYear()} Shamim Hossain
             </span>
           </div>
         </div>
