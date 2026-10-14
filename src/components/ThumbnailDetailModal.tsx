@@ -1,0 +1,269 @@
+import React, { useState } from 'react';
+import { ThumbnailItem, Language } from '../types';
+import { translations } from '../utils/i18n';
+import { 
+  Download, 
+  Copy, 
+  Check, 
+  X, 
+  Maximize2, 
+  Share2, 
+  Bookmark, 
+  FileText, 
+  Layers, 
+  Calendar, 
+  HardDrive,
+  Eye
+} from 'lucide-react';
+import { copyToClipboard, downloadImage } from '../utils/storage';
+
+interface ThumbnailDetailModalProps {
+  item: ThumbnailItem;
+  isOpen: boolean;
+  onClose: () => void;
+  language: Language;
+  isBookmarked: boolean;
+  onToggleBookmark: (id: string) => void;
+  onIncrementDownload: (id: string) => void;
+  onIncrementCopy: (id: string) => void;
+  showToast: (msg: string, type?: 'success' | 'info' | 'warning') => void;
+}
+
+export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
+  item,
+  isOpen,
+  onClose,
+  language,
+  isBookmarked,
+  onToggleBookmark,
+  onIncrementDownload,
+  onIncrementCopy,
+  showToast,
+}) => {
+  const t = translations[language];
+  const [copiedTitle, setCopiedTitle] = useState(false);
+  const [copiedDesc, setCopiedDesc] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleCopyTitle = async () => {
+    const success = await copyToClipboard(item.title);
+    if (success) {
+      setCopiedTitle(true);
+      onIncrementCopy(item.id);
+      showToast(t.titleCopied, 'success');
+      setTimeout(() => setCopiedTitle(false), 2000);
+    }
+  };
+
+  const handleCopyDesc = async () => {
+    const success = await copyToClipboard(item.description);
+    if (success) {
+      setCopiedDesc(true);
+      onIncrementCopy(item.id);
+      showToast(t.descriptionCopied, 'success');
+      setTimeout(() => setCopiedDesc(false), 2000);
+    }
+  };
+
+  const handleCopyAll = async () => {
+    const combined = `[TITLE / শিরোনাম]:\n${item.title}\n\n[DESCRIPTION / বিবরণ]:\n${item.description}\n\n[TAGS / ট্যাগ]:\n${item.tags?.join(', ') || ''}`;
+    const success = await copyToClipboard(combined);
+    if (success) {
+      setCopiedAll(true);
+      onIncrementCopy(item.id);
+      showToast(t.allCopied, 'success');
+      setTimeout(() => setCopiedAll(false), 2000);
+    }
+  };
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    showToast(t.downloadStarted, 'info');
+    onIncrementDownload(item.id);
+    await downloadImage(item.imageUrl, item.title);
+    setIsDownloading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+      <div 
+        className="relative w-full max-w-4xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Top Header */}
+        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/40">
+          <div className="flex items-center gap-2 text-xs text-slate-400">
+            <span className="font-semibold text-indigo-400">{item.category}</span>
+            <span aria-hidden="true">·</span>
+            <span className="font-mono">{item.resolution}</span>
+            <span aria-hidden="true">·</span>
+            <span>{item.createdAt}</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onToggleBookmark(item.id)}
+              className={`p-2 rounded-lg border transition-colors ${
+                isBookmarked 
+                  ? 'border-indigo-500/40 bg-indigo-500/20 text-indigo-400' 
+                  : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-white'
+              }`}
+              title={isBookmarked ? 'বুকমার্ক সরানো' : 'বুকমার্কে রাখুন'}
+            >
+              <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Image Display */}
+        <div className="relative aspect-video w-full bg-slate-950 group">
+          <img
+            src={item.imageUrl}
+            alt={item.title}
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-contain sm:object-cover"
+          />
+          <div className="absolute bottom-4 right-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-xl shadow-indigo-600/30 transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isDownloading ? 'ডাউনলোড হচ্ছে...' : t.downloadThumbnail}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-6 sm:p-8 space-y-6">
+          {/* Title Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {language === 'bn' ? 'থাম্বনেইল শিরোনাম (Title)' : 'Thumbnail Title'}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyTitle}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-200 hover:text-white transition-all whitespace-nowrap"
+              >
+                {copiedTitle ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">{language === 'bn' ? 'কপি হয়েছে' : 'Copied!'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{t.copyTitle}</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <h2 className="text-lg sm:text-xl font-bold text-white leading-snug">
+              {item.title}
+            </h2>
+          </div>
+
+          {/* Description Section */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                {language === 'bn' ? 'কনটেন্ট বিবরণ (Description)' : 'Content Description'}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyDesc}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-200 hover:text-white transition-all whitespace-nowrap"
+              >
+                {copiedDesc ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">{language === 'bn' ? 'কপি হয়েছে' : 'Copied!'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>{t.copyDescription}</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line select-text">
+              {item.description}
+            </div>
+          </div>
+
+          {/* Tags */}
+          {item.tags && item.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-400">
+              <span className="font-semibold text-slate-500">ট্যাগ:</span>
+              {item.tags.map((tag, idx) => (
+                <span key={idx} className="text-slate-300">
+                  #{tag}{idx < item.tags.length - 1 ? ' ·' : ''}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Bottom Action Bar */}
+          <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
+              <span className="flex items-center gap-1">
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="tabular-nums font-semibold text-slate-200">{item.downloadsCount}</span> {language === 'bn' ? 'ডাউনলোড' : 'downloads'}
+              </span>
+              <span className="flex items-center gap-1">
+                <Copy className="w-3.5 h-3.5 text-amber-400" />
+                <span className="tabular-nums font-semibold text-slate-200">{item.copiesCount}</span> {language === 'bn' ? 'কপি' : 'copies'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleCopyAll}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-semibold text-white transition-all"
+              >
+                {copiedAll ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-400">{language === 'bn' ? 'সব কপি হয়েছে!' : 'All Copied!'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>{t.copyAll}</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-600/25 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                <span>{t.downloadThumbnail}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

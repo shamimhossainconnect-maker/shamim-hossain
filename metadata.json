@@ -1,0 +1,8 @@
+{
+  "name": "ThumbnailHub - অ্যাডমিন ও ইউজার পোর্টাল",
+  "description": "সুরক্ষিত অ্যাডমিন প্যানেল এবং থাম্বনেইল ডাউনলোড ও কপি সুবিধাযুক্ত ইউজার ড্যাশবোর্ড।",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
