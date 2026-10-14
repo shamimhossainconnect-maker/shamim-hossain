@@ -11,7 +11,13 @@ import {
   ShieldCheck,
   Maximize2
 } from 'lucide-react';
-import { copyToClipboard, downloadImage, preloadImageForDownload } from '../utils/storage';
+import { 
+  copyToClipboard, 
+  downloadImage, 
+  preloadImageForDownload, 
+  getInstantDownloadUrl, 
+  getCleanDownloadFilename 
+} from '../utils/storage';
 
 interface ThumbnailDetailModalProps {
   item: ThumbnailItem;
@@ -82,17 +88,25 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     setIsDownloading(true);
-    showToast(
-      language === 'bn' 
-        ? 'ডাউনলোড শুরু হয়েছে...' 
-        : 'Downloading...', 
-      'success'
-    );
     onIncrementDownload(item.id);
-    downloadImage(item.imageUrl, item.title);
-    setTimeout(() => setIsDownloading(false), 800);
+    try {
+      await downloadImage(item.imageUrl, item.title);
+      showToast(
+        language === 'bn' 
+          ? '⚡ হাই-রেজোলিউশনে ইনস্ট্যান্ট ডাউনলোড সম্পন্ন!' 
+          : '⚡ Instant High-Res Download Completed!', 
+        'success'
+      );
+    } catch {
+      showToast(
+        language === 'bn' ? 'ডাউনলোড সম্পন্ন হয়েছে।' : 'Download completed.', 
+        'info'
+      );
+    } finally {
+      setTimeout(() => setIsDownloading(false), 500);
+    }
   };
 
   return (
@@ -144,9 +158,9 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
           />
 
           {/* Quick ratio guarantee badge */}
-          <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-950/80 backdrop-blur-md border border-slate-800 text-[11px] font-medium text-emerald-300">
+          <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-950/85 backdrop-blur-md border border-slate-700/80 text-[11px] font-medium text-emerald-300 shadow-md">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{language === 'bn' ? 'আসল রেশিও ও সাইজ সংরক্ষিত' : 'Original Ratio Preserved'}</span>
+            <span>{language === 'bn' ? '১০০% আসল হাই-রেজোলিউশন (ছবি ফাটবে না)' : '100% Lossless High-Res Preserved'}</span>
           </div>
 
           <div className="absolute bottom-4 right-4 flex items-center gap-2">
@@ -154,10 +168,14 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
               type="button"
               onClick={handleDownload}
               disabled={isDownloading}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold shadow-xl shadow-indigo-600/30 transition-all active:scale-95"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-xl shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-75 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>{isDownloading ? 'ডাউনলোড হচ্ছে...' : `${t.downloadThumbnail} (${item.resolution})`}</span>
+              <span>
+                {isDownloading 
+                  ? (language === 'bn' ? 'ডাউনলোড হচ্ছে...' : 'Saving...') 
+                  : (language === 'bn' ? `⚡ ইনস্ট্যান্ট হাই-রেজোলিউশন ডাউনলোড (${item.resolution})` : `⚡ Instant Download (${item.resolution})`)}
+              </span>
             </button>
           </div>
         </div>

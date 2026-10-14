@@ -3,6 +3,7 @@ import { ThumbnailItem, Language } from '../types';
 import { translations } from '../utils/i18n';
 import { SOCIAL_MEDIA_PLATFORMS, SocialMediaPreset } from '../data/socialMediaSizes';
 import { SocialMediaSizeGuide } from './SocialMediaSizeGuide';
+import { registerFileBlob, downloadImage, preloadImageForDownload } from '../utils/storage';
 import { 
   UploadCloud, 
   Plus, 
@@ -131,11 +132,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (event.target?.result) {
           const res = event.target.result as string;
           setImageUrl(res);
+          registerFileBlob(res, file);
           detectImageDimensions(res);
           showToast(
             language === 'bn' 
-              ? 'ছবি সফলভাবে লোড হয়েছে (আসল রেশিও সংরক্ষিত)!' 
-              : 'Image loaded with exact ratio preserved!', 
+              ? 'ছবি সফলভাবে লোড হয়েছে (আসল রেশিও ও হাই রেজোলিউশন সংরক্ষিত)!' 
+              : 'Image loaded with 100% original quality preserved!', 
             'success'
           );
         }
@@ -160,6 +162,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (event.target?.result) {
           const res = event.target.result as string;
           setImageUrl(res);
+          registerFileBlob(res, file);
           detectImageDimensions(res);
           showToast(
             language === 'bn' 
@@ -526,6 +529,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                           <button
                             type="button"
+                            onClick={async () => {
+                              showToast(language === 'bn' ? '⚡ ডাউনলোড হচ্ছে...' : '⚡ Downloading...', 'info');
+                              await downloadImage(item.imageUrl, item.title);
+                              showToast(language === 'bn' ? '✅ হাই-রেজোলিউশনে ডাউনলোড সম্পন্ন!' : '✅ Download completed!', 'success');
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+                            title="হাই-রেজোলিউশনে সরাসরি ডাউনলোড করুন"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            type="button"
                             onClick={() => handleOpenEdit(item)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors"
                             title="সম্পাদনা করুন"
@@ -650,8 +666,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="url"
                     value={imageUrl}
                     onChange={(e) => {
-                      setImageUrl(e.target.value);
-                      if (e.target.value) detectImageDimensions(e.target.value);
+                      const val = e.target.value;
+                      setImageUrl(val);
+                      if (val) {
+                        detectImageDimensions(val);
+                        preloadImageForDownload(val);
+                      }
                     }}
                     placeholder="https://example.com/photo.jpg"
                     className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none"

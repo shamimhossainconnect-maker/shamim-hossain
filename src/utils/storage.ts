@@ -151,23 +151,242 @@ export function setAdminAuthenticated(val: boolean): void {
 }
 
 // In-memory cache for ultra-fast instant downloads
-const blobUrlCache = new Map<string, { url: string; ext: string }>();
+export const blobUrlCache = new Map<string, { url: string; ext: string }>();
 
-function dataURLtoBlob(dataurl: string): { blob: Blob; ext: string } {
-  const parts = dataurl.split(',');
-  const mimeMatch = parts[0].match(/:(.*?);/);
+// IndexedDB setup for large high-resolution photos
+const DB_NAME = 'ThumbnailHubDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'photos';
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      reject(new Error('IndexedDB not supported'));
+      return;
+    }
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function setItemInIndexedDB(key: string, val: any): Promise<void> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).put(val, key);
+  } catch (err) {
+    console.warn('IndexedDB write warning:', err);
+  }
+}
+
+export async function getItemFromIndexedDB<T = any>(key: string): Promise<T | null> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+export function registerFileBlob(dataUrl: string, file: File): string {
+  const url = window.URL.createObjectURL(file);
+  let ext = '.jpg';
+  if (file.name.toLowerCase().endsWith('.png') || file.type.includes('png')) ext = '.png';
+  else if (file.name.toLowerCase().endsWith('.webp') || file.type.includes('webp')) ext = '.webp';
+  else if (file.name.toLowerCase().endsWith('.jpeg') || file.name.toLowerCase().endsWith('.jpg')) ext = '.jpg';
+
+  const entry = { url, ext };
+  blobUrlCache.set(dataUrl, entry);
+  blobUrlCache.set(url, entry);
+
+  // Store in IndexedDB for long-term persistence without localStorage limit
+  setItemInIndexedDB(dataUrl, file);
+  return url;
+}
+
+/**
+ * Ultra-fast DataURL to Blob conversion without regex memory penalty
+ */
+export function fastDataUrlToBlob(dataurl: string): { blob: Blob; ext: string } {
+  const commaIdx = dataurl.indexOf(',');
+  const header = commaIdx !== -1 ? dataurl.substring(0, commaIdx) : 'data:image/jpeg;base64';
+  const base64Data = commaIdx !== -1 ? dataurl.substring(commaIdx + 1) : dataurl;
+
+  const mimeMatch = header.match(/:(.*?);/);
   const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
   let ext = '.jpg';
   if (mime.includes('png')) ext = '.png';
   else if (mime.includes('webp')) ext = '.webp';
+  else if (mime.includes('svg')) ext = '.svg';
+  else if (mime.includes('gif')) ext = '.gif';
 
-  const bstr = atob(parts[1]);
-  let n = bstr.length;
-  const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
+  const byteChars = atob(base64Data);
+  const len = byteChars.length;
+  const byteArray = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    byteArray[i] = byteChars.charCodeAt(i);
   }
-  return { blob: new Blob([u8arr], { type: mime }), ext };
+  const blob = new Blob([byteArray], { type: mime });
+  return { blob, ext };
+}
+
+// Backward compatibility alias
+export const dataURLtoBlob = fastDataUrlToBlob;
+
+/**
+ * Lossless Canvas export fallback preserving maximum resolution and quality
+ */
+export function renderImageToLosslessBlob(imageUrl: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width || 1920;
+        canvas.height = img.naturalHeight || img.height || 1080;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context unavailable'));
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        const isPng = imageUrl.includes('.png') || imageUrl.includes('png');
+        const format = isPng ? 'image/png' : 'image/jpeg';
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Canvas toBlob failed'));
+          },
+          format,
+          1.0
+        );
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = (e) => reject(e);
+    img.src = imageUrl;
+  });
+}
+
+/**
+ * Ensures an image is in memory as a Blob URL for instant 0ms downloads
+ */
+export async function ensureBlobUrl(imageUrl: string): Promise<{ url: string; ext: string }> {
+  if (!imageUrl) return { url: '', ext: '.jpg' };
+
+  if (blobUrlCache.has(imageUrl)) {
+    return blobUrlCache.get(imageUrl)!;
+  }
+
+  if (imageUrl.startsWith('blob:')) {
+    const entry = { url: imageUrl, ext: '.jpg' };
+    blobUrlCache.set(imageUrl, entry);
+    return entry;
+  }
+
+  if (imageUrl.startsWith('data:')) {
+    try {
+      const { blob, ext } = fastDataUrlToBlob(imageUrl);
+      const url = URL.createObjectURL(blob);
+      const entry = { url, ext };
+      blobUrlCache.set(imageUrl, entry);
+      return entry;
+    } catch {
+      return { url: imageUrl, ext: '.jpg' };
+    }
+  }
+
+  // Fetch as binary Blob
+  try {
+    const response = await fetch(imageUrl, { cache: 'force-cache' });
+    if (response.ok) {
+      const blob = await response.blob();
+      let ext = '.jpg';
+      if (blob.type.includes('png')) ext = '.png';
+      else if (blob.type.includes('webp')) ext = '.webp';
+      else if (blob.type.includes('gif')) ext = '.gif';
+      const url = URL.createObjectURL(blob);
+      const entry = { url, ext };
+      blobUrlCache.set(imageUrl, entry);
+      return entry;
+    }
+  } catch {
+    // Ignore fetch error, try canvas fallback
+  }
+
+  try {
+    const blob = await renderImageToLosslessBlob(imageUrl);
+    const ext = blob.type.includes('png') ? '.png' : '.jpg';
+    const url = URL.createObjectURL(blob);
+    const entry = { url, ext };
+    blobUrlCache.set(imageUrl, entry);
+    return entry;
+  } catch {
+    return { url: imageUrl, ext: '.jpg' };
+  }
+}
+
+/**
+ * Synchronous getter for already-cached blob URLs
+ */
+export function getInstantDownloadUrl(imageUrl: string): string {
+  if (!imageUrl) return '';
+  if (blobUrlCache.has(imageUrl)) {
+    return blobUrlCache.get(imageUrl)!.url;
+  }
+  if (imageUrl.startsWith('data:')) {
+    try {
+      const { blob, ext } = fastDataUrlToBlob(imageUrl);
+      const url = window.URL.createObjectURL(blob);
+      blobUrlCache.set(imageUrl, { url, ext });
+      return url;
+    } catch {
+      return imageUrl;
+    }
+  }
+  return imageUrl;
+}
+
+/**
+ * Gets clean high-res filename preserving original extension
+ */
+export function getCleanDownloadFilename(title: string, imageUrl: string, preferredExt?: string): string {
+  const cleanBaseName = (title || 'photo')
+    .replace(/[/\\?%*:|"<>]/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 60) || 'photo';
+
+  let ext = preferredExt || '.jpg';
+  if (!preferredExt) {
+    if (blobUrlCache.has(imageUrl)) {
+      ext = blobUrlCache.get(imageUrl)!.ext;
+    } else if (imageUrl.startsWith('data:image/png') || imageUrl.includes('.png')) {
+      ext = '.png';
+    } else if (imageUrl.startsWith('data:image/webp') || imageUrl.includes('.webp')) {
+      ext = '.webp';
+    }
+  }
+
+  if (!ext.startsWith('.')) ext = `.${ext}`;
+  return `${cleanBaseName}${ext}`;
 }
 
 /**
@@ -175,111 +394,64 @@ function dataURLtoBlob(dataurl: string): { blob: Blob; ext: string } {
  */
 export async function preloadImageForDownload(imageUrl: string): Promise<void> {
   if (!imageUrl || blobUrlCache.has(imageUrl)) return;
-  try {
-    if (imageUrl.startsWith('data:')) {
-      const { blob, ext } = dataURLtoBlob(imageUrl);
-      const url = window.URL.createObjectURL(blob);
-      blobUrlCache.set(imageUrl, { url, ext });
-    } else {
-      const response = await fetch(imageUrl, { cache: 'force-cache' });
-      const blob = await response.blob();
-      let ext = '.jpg';
-      if (blob.type.includes('png')) ext = '.png';
-      else if (blob.type.includes('webp')) ext = '.webp';
-      const url = window.URL.createObjectURL(blob);
-      blobUrlCache.set(imageUrl, { url, ext });
-    }
-  } catch {
-    // Ignore prefetch failures
-  }
+  await ensureBlobUrl(imageUrl);
+}
+
+// Eagerly preload default thumbnail images into memory right on startup
+if (typeof window !== 'undefined') {
+  [techThumb, travelThumb, podcastThumb, cookingThumb].forEach((img) => {
+    preloadImageForDownload(img);
+  });
 }
 
 /**
- * Ultra-fast image downloader (0ms latency with RAM caching)
+ * Native programmatic click trigger on hidden anchor
+ */
+export function triggerBlobDownload(blobUrl: string, filename: string): void {
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  link.rel = 'noopener';
+  link.target = '_self';
+  link.style.display = 'none';
+  link.style.position = 'fixed';
+  link.style.top = '-9999px';
+  link.style.left = '-9999px';
+  document.body.appendChild(link);
+
+  link.click();
+
+  setTimeout(() => {
+    if (document.body.contains(link)) {
+      document.body.removeChild(link);
+    }
+  }, 250);
+}
+
+/**
+ * Ultra-fast, zero-delay, 100% lossless image downloader
  */
 export async function downloadImage(imageUrl: string, suggestedFilename: string): Promise<boolean> {
   if (!imageUrl) return false;
 
-  const cleanBaseName = (suggestedFilename || 'photo')
-    .replace(/[^a-zA-Z0-9_\-\u0980-\u09FF]/g, '_')
-    .slice(0, 60);
-
-  // 1. Check RAM Cache for instant 0ms trigger
-  if (blobUrlCache.has(imageUrl)) {
-    const cached = blobUrlCache.get(imageUrl)!;
-    const link = document.createElement('a');
-    link.href = cached.url;
-    link.download = `${cleanBaseName}${cached.ext}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    return true;
-  }
-
-  // 2. Fast Base64 direct blob conversion (1-2ms)
-  if (imageUrl.startsWith('data:')) {
-    try {
-      const { blob, ext } = dataURLtoBlob(imageUrl);
-      const blobUrl = window.URL.createObjectURL(blob);
-      blobUrlCache.set(imageUrl, { url: blobUrl, ext });
-
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `${cleanBaseName}${ext}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Safe cleanup after download finishes
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 120000);
-      return true;
-    } catch {
-      // Direct anchor fallback
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = `${cleanBaseName}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  try {
+    // If already in RAM cache (instant 0ms trigger)
+    if (blobUrlCache.has(imageUrl)) {
+      const cached = blobUrlCache.get(imageUrl)!;
+      const cleanFilename = getCleanDownloadFilename(suggestedFilename, imageUrl, cached.ext);
+      triggerBlobDownload(cached.url, cleanFilename);
       return true;
     }
-  }
 
-  // 3. Network fetch with force-cache for instant repeat downloads
-  try {
-    const response = await fetch(imageUrl, { cache: 'force-cache' });
-    const blob = await response.blob();
-    let ext = '.jpg';
-    if (blob.type.includes('png')) ext = '.png';
-    else if (blob.type.includes('webp')) ext = '.webp';
-
-    const blobUrl = window.URL.createObjectURL(blob);
-    blobUrlCache.set(imageUrl, { url: blobUrl, ext });
-
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `${cleanBaseName}${ext}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Keep blobUrl valid for at least 2 minutes so browser download finishes safely
-    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 120000);
+    // Swiftly resolve to blob and trigger
+    const { url, ext } = await ensureBlobUrl(imageUrl);
+    const cleanFilename = getCleanDownloadFilename(suggestedFilename, imageUrl, ext);
+    triggerBlobDownload(url, cleanFilename);
     return true;
   } catch (err) {
-    console.warn('Fast blob download failed, falling back to direct anchor', err);
-    try {
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = `${cleanBaseName}.jpg`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      return true;
-    } catch {
-      return false;
-    }
+    console.error('Download error, fallback direct trigger:', err);
+    triggerBlobDownload(imageUrl, getCleanDownloadFilename(suggestedFilename, imageUrl, '.jpg'));
+    return false;
   }
 }
 

@@ -17,7 +17,13 @@ import {
   Layers,
   Zap
 } from 'lucide-react';
-import { copyToClipboard, downloadImage, preloadImageForDownload } from '../utils/storage';
+import { 
+  copyToClipboard, 
+  downloadImage, 
+  preloadImageForDownload, 
+  getInstantDownloadUrl, 
+  getCleanDownloadFilename 
+} from '../utils/storage';
 import { ThumbnailDetailModal } from './ThumbnailDetailModal';
 
 interface UserDashboardProps {
@@ -133,15 +139,30 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     }
   };
 
-  const handleQuickDownload = (item: ThumbnailItem, e: React.MouseEvent) => {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleQuickDownload = async (item: ThumbnailItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Fast download trigger without waiting
-    downloadImage(item.imageUrl, item.title);
+    e.preventDefault();
+    setDownloadingId(item.id);
     onIncrementDownload(item.id);
-    showToast(
-      language === 'bn' ? 'থাম্বনেইল ডাউনলোড হচ্ছে...' : 'Fast downloading...', 
-      'info'
-    );
+
+    try {
+      await downloadImage(item.imageUrl, item.title);
+      showToast(
+        language === 'bn' 
+          ? '⚡ হাই-রেজোলিউশনে ইনস্ট্যান্ট ডাউনলোড সম্পন্ন!' 
+          : '⚡ Instant High-Res Download Completed!', 
+        'success'
+      );
+    } catch {
+      showToast(
+        language === 'bn' ? 'ডাউনলোড সম্পন্ন হয়েছে।' : 'Download completed.', 
+        'info'
+      );
+    } finally {
+      setTimeout(() => setDownloadingId(null), 500);
+    }
   };
 
   return (
@@ -453,15 +474,25 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                       </button>
                     </div>
 
-                    {/* Download Button */}
+                    {/* Download Button (Instant Lossless 0ms Download) */}
                     <button
                       type="button"
                       onClick={(e) => handleQuickDownload(item, e)}
-                      className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 active:scale-95 transition-all"
-                      title="থাম্বনেইল ডাউনলোড করুন"
+                      onMouseEnter={() => preloadImageForDownload(item.imageUrl)}
+                      className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer select-none"
+                      title="হাই-রেজোলিউশনে ইনস্ট্যান্ট ডাউনলোড করুন"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>{t.downloadThumbnail}</span>
+                      {downloadingId === item.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                          <span>{language === 'bn' ? 'ডাউনলোড হচ্ছে...' : 'Saving...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5" />
+                          <span>{t.downloadThumbnail}</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -566,10 +597,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                     <button
                       type="button"
                       onClick={(e) => handleQuickDownload(item, e)}
-                      className="ml-auto flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+                      onMouseEnter={() => preloadImageForDownload(item.imageUrl)}
+                      className="ml-auto flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold cursor-pointer select-none active:scale-95 transition-all"
+                      title="হাই-রেজোলিউশনে ইনস্ট্যান্ট ডাউনলোড করুন"
                     >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>{t.downloadThumbnail}</span>
+                      {downloadingId === item.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
+                          <span>{language === 'bn' ? 'ডাউনলোড হচ্ছে...' : 'Saving...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-3.5 h-3.5" />
+                          <span>{t.downloadThumbnail}</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

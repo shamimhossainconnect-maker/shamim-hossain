@@ -7,7 +7,8 @@ import {
   getBookmarks, 
   toggleBookmark, 
   isAdminAuthenticated, 
-  setAdminAuthenticated 
+  setAdminAuthenticated,
+  preloadImageForDownload
 } from './utils/storage';
 import { translations } from './utils/i18n';
 import { Navbar } from './components/Navbar';
@@ -25,6 +26,15 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   const t = translations[language];
+
+  // Eagerly preload and convert all thumbnail images into RAM Blobs for 0ms instant download
+  useEffect(() => {
+    items.forEach((item) => {
+      if (item.imageUrl) {
+        preloadImageForDownload(item.imageUrl);
+      }
+    });
+  }, [items]);
 
   // Toast dispatcher
   const showToast = (message: string, type: 'success' | 'info' | 'warning' = 'info') => {
