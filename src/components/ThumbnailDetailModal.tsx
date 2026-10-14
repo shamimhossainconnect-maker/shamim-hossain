@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Maximize2
 } from 'lucide-react';
-import { copyToClipboard, downloadImage } from '../utils/storage';
+import { copyToClipboard, downloadImage, preloadImageForDownload } from '../utils/storage';
 
 interface ThumbnailDetailModalProps {
   item: ThumbnailItem;
@@ -41,6 +41,13 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
   const [copiedDesc, setCopiedDesc] = useState(false);
   const [copiedAll, setCopiedAll] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  // Preload this high-res image into RAM as soon as modal opens
+  React.useEffect(() => {
+    if (isOpen && item?.imageUrl) {
+      preloadImageForDownload(item.imageUrl);
+    }
+  }, [isOpen, item?.imageUrl]);
 
   if (!isOpen) return null;
 
@@ -75,17 +82,17 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
     }
   };
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     setIsDownloading(true);
     showToast(
       language === 'bn' 
-        ? 'আসল রেজোলিউশন ও রেশিও অনুযায়ী ডাউনলোড শুরু হয়েছে...' 
-        : 'Downloading in original exact resolution and ratio...', 
-      'info'
+        ? 'ডাউনলোড শুরু হয়েছে...' 
+        : 'Downloading...', 
+      'success'
     );
     onIncrementDownload(item.id);
-    await downloadImage(item.imageUrl, item.title);
-    setIsDownloading(false);
+    downloadImage(item.imageUrl, item.title);
+    setTimeout(() => setIsDownloading(false), 800);
   };
 
   return (

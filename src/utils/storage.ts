@@ -150,55 +150,128 @@ export function setAdminAuthenticated(val: boolean): void {
   }
 }
 
+// In-memory cache for ultra-fast instant downloads
+const blobUrlCache = new Map<string, { url: string; ext: string }>();
+
+function dataURLtoBlob(dataurl: string): { blob: Blob; ext: string } {
+  const parts = dataurl.split(',');
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  let ext = '.jpg';
+  if (mime.includes('png')) ext = '.png';
+  else if (mime.includes('webp')) ext = '.webp';
+
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return { blob: new Blob([u8arr], { type: mime }), ext };
+}
+
 /**
- * Downloads image directly to user's computer/phone preserving exact resolution, ratio and original format
+ * Preloads image into RAM so clicking download triggers in 0 milliseconds
+ */
+export async function preloadImageForDownload(imageUrl: string): Promise<void> {
+  if (!imageUrl || blobUrlCache.has(imageUrl)) return;
+  try {
+    if (imageUrl.startsWith('data:')) {
+      const { blob, ext } = dataURLtoBlob(imageUrl);
+      const url = window.URL.createObjectURL(blob);
+      blobUrlCache.set(imageUrl, { url, ext });
+    } else {
+      const response = await fetch(imageUrl, { cache: 'force-cache' });
+      const blob = await response.blob();
+      let ext = '.jpg';
+      if (blob.type.includes('png')) ext = '.png';
+      else if (blob.type.includes('webp')) ext = '.webp';
+      const url = window.URL.createObjectURL(blob);
+      blobUrlCache.set(imageUrl, { url, ext });
+    }
+  } catch {
+    // Ignore prefetch failures
+  }
+}
+
+/**
+ * Ultra-fast image downloader (0ms latency with RAM caching)
  */
 export async function downloadImage(imageUrl: string, suggestedFilename: string): Promise<boolean> {
-  try {
-    let ext = '.jpg';
-    if (imageUrl.startsWith('data:image/png')) ext = '.png';
-    else if (imageUrl.startsWith('data:image/webp')) ext = '.webp';
-    else if (imageUrl.startsWith('data:image/jpeg') || imageUrl.startsWith('data:image/jpg')) ext = '.jpg';
-    else if (imageUrl.includes('.png')) ext = '.png';
-    else if (imageUrl.includes('.webp')) ext = '.webp';
+  if (!imageUrl) return false;
 
-    const cleanBaseName = (suggestedFilename || 'photo')
-      .replace(/[^a-zA-Z0-9_\-\u0980-\u09FF]/g, '_')
-      .slice(0, 60);
+  const cleanBaseName = (suggestedFilename || 'photo')
+    .replace(/[^a-zA-Z0-9_\-\u0980-\u09FF]/g, '_')
+    .slice(0, 60);
 
-    // If it's a data url or blob url, trigger direct download immediately
-    if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
+  // 1. Check RAM Cache for instant 0ms trigger
+  if (blobUrlCache.has(imageUrl)) {
+    const cached = blobUrlCache.get(imageUrl)!;
+    const link = document.createElement('a');
+    link.href = cached.url;
+    link.download = `${cleanBaseName}${cached.ext}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  }
+
+  // 2. Fast Base64 direct blob conversion (1-2ms)
+  if (imageUrl.startsWith('data:')) {
+    try {
+      const { blob, ext } = dataURLtoBlob(imageUrl);
+      const blobUrl = window.URL.createObjectURL(blob);
+      blobUrlCache.set(imageUrl, { url: blobUrl, ext });
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${cleanBaseName}${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Safe cleanup after download finishes
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 120000);
+      return true;
+    } catch {
+      // Direct anchor fallback
       const link = document.createElement('a');
       link.href = imageUrl;
-      link.download = `${cleanBaseName}${ext}`;
+      link.download = `${cleanBaseName}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       return true;
     }
+  }
 
-    // Fetch original blob preserving exact bytes and dimensions
-    const response = await fetch(imageUrl);
+  // 3. Network fetch with force-cache for instant repeat downloads
+  try {
+    const response = await fetch(imageUrl, { cache: 'force-cache' });
     const blob = await response.blob();
-    if (blob.type === 'image/png') ext = '.png';
-    else if (blob.type === 'image/webp') ext = '.webp';
-    else if (blob.type === 'image/jpeg') ext = '.jpg';
+    let ext = '.jpg';
+    if (blob.type.includes('png')) ext = '.png';
+    else if (blob.type.includes('webp')) ext = '.webp';
 
     const blobUrl = window.URL.createObjectURL(blob);
+    blobUrlCache.set(imageUrl, { url: blobUrl, ext });
+
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = `${cleanBaseName}${ext}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    window.URL.revokeObjectURL(blobUrl);
+
+    // Keep blobUrl valid for at least 2 minutes so browser download finishes safely
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 120000);
     return true;
-  } catch (error) {
-    console.warn('Direct blob fetch failed, falling back to direct link download', error);
+  } catch (err) {
+    console.warn('Fast blob download failed, falling back to direct anchor', err);
     try {
       const link = document.createElement('a');
       link.href = imageUrl;
-      link.download = (suggestedFilename || 'photo') + '.jpg';
+      link.download = `${cleanBaseName}.jpg`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();

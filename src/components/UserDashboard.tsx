@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ThumbnailItem, Language } from '../types';
 import { translations } from '../utils/i18n';
 import { 
@@ -14,9 +14,10 @@ import {
   ArrowUpDown, 
   Sparkles,
   ExternalLink,
-  Layers
+  Layers,
+  Zap
 } from 'lucide-react';
-import { copyToClipboard, downloadImage } from '../utils/storage';
+import { copyToClipboard, downloadImage, preloadImageForDownload } from '../utils/storage';
 import { ThumbnailDetailModal } from './ThumbnailDetailModal';
 
 interface UserDashboardProps {
@@ -99,6 +100,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       });
   }, [items, selectedCategory, searchQuery, sortBy, bookmarks]);
 
+  // Automatically preload visible items into RAM for instant 0ms downloads
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      filteredItems.slice(0, 10).forEach((item) => {
+        preloadImageForDownload(item.imageUrl);
+      });
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [filteredItems]);
+
   // Card Quick Actions
   const handleQuickCopyTitle = async (item: ThumbnailItem, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -122,11 +133,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     }
   };
 
-  const handleQuickDownload = async (item: ThumbnailItem, e: React.MouseEvent) => {
+  const handleQuickDownload = (item: ThumbnailItem, e: React.MouseEvent) => {
     e.stopPropagation();
-    showToast(t.downloadStarted, 'info');
+    // Fast download trigger without waiting
+    downloadImage(item.imageUrl, item.title);
     onIncrementDownload(item.id);
-    await downloadImage(item.imageUrl, item.title);
+    showToast(
+      language === 'bn' ? 'থাম্বনেইল ডাউনলোড হচ্ছে...' : 'Fast downloading...', 
+      'info'
+    );
   };
 
   return (
