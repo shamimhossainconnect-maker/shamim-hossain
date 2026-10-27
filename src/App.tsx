@@ -74,9 +74,9 @@ export default function App() {
     );
   };
 
-  // Item additions
+  // Item additions with custom date selection support
   const handleAddItem = (
-    newItemData: Omit<ThumbnailItem, 'id' | 'downloadsCount' | 'copiesCount' | 'createdAt'>
+    newItemData: Omit<ThumbnailItem, 'id' | 'downloadsCount' | 'copiesCount' | 'createdAt'> & { createdAt?: string }
   ) => {
     const today = new Date().toISOString().split('T')[0];
     const newItem: ThumbnailItem = {
@@ -84,7 +84,7 @@ export default function App() {
       id: `item-${Date.now()}`,
       downloadsCount: 0,
       copiesCount: 0,
-      createdAt: today,
+      createdAt: newItemData.createdAt || today,
     };
     const updated = [newItem, ...items];
     setItems(updated);
