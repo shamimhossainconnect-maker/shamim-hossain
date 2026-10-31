@@ -19,12 +19,19 @@ import {
   Search,
   Sparkles,
   Smartphone,
-  Maximize2
+  Maximize2,
+  Calendar
 } from 'lucide-react';
+import { 
+  formatDisplayDate, 
+  formatDateWithRelative, 
+  getTodayDateString, 
+  getDateOffsetDays 
+} from '../utils/dateFormatter';
 
 interface AdminDashboardProps {
   items: ThumbnailItem[];
-  onAddItem: (item: Omit<ThumbnailItem, 'id' | 'downloadsCount' | 'copiesCount' | 'createdAt'>) => void;
+  onAddItem: (item: Omit<ThumbnailItem, 'id' | 'downloadsCount' | 'copiesCount' | 'createdAt'> & { createdAt?: string }) => void;
   onUpdateItem: (item: ThumbnailItem) => void;
   onDeleteItem: (id: string) => void;
   onResetDefault: () => void;
@@ -73,6 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [resolution, setResolution] = useState('1920 × 1080 px (16:9)');
   const [detectedNativeRes, setDetectedNativeRes] = useState<string | null>(null);
   const [fileSizeStr, setFileSizeStr] = useState('1.5 MB');
+  const [createdAtInput, setCreatedAtInput] = useState<string>(getTodayDateString());
 
   // Search & Filter state in Admin table
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,6 +194,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setResolution('1920 × 1080 px (16:9)');
     setDetectedNativeRes(null);
     setFileSizeStr('1.5 MB');
+    setCreatedAtInput(getTodayDateString());
     setIsEditing(null);
     setShowUploadModal(false);
   };
@@ -199,6 +208,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setTagsInput(item.tags?.join(', ') || '');
     setResolution(item.resolution || '1920 × 1080 px (16:9)');
     setFileSizeStr(item.fileSize || '1.5 MB');
+    setCreatedAtInput(item.createdAt || getTodayDateString());
     setShowUploadModal(true);
   };
 
@@ -231,6 +241,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       .split(',')
       .map((t) => t.trim())
       .filter(Boolean);
+    const finalDate = createdAtInput.trim() || getTodayDateString();
 
     if (isEditing) {
       const existing = items.find((i) => i.id === isEditing);
@@ -244,6 +255,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           tags: finalTags.length > 0 ? finalTags : ['Thumbnail'],
           resolution,
           fileSize: fileSizeStr,
+          createdAt: finalDate,
         });
         showToast(t.updateSuccess, 'success');
       }
@@ -256,6 +268,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         tags: finalTags.length > 0 ? finalTags : ['Thumbnail', 'Featured'],
         resolution,
         fileSize: fileSizeStr,
+        createdAt: finalDate,
       });
       showToast(t.uploadSuccess, 'success');
     }
@@ -490,8 +503,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="text-slate-400 line-clamp-2 mt-0.5 text-[11px] leading-relaxed">
                           {item.description}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-1.5 font-mono">
-                          <span>{item.createdAt}</span>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-1.5 font-mono">
+                          <span className="flex items-center gap-1 text-indigo-300">
+                            <Calendar className="w-3 h-3 text-indigo-400" />
+                            {formatDisplayDate(item.createdAt, language)}
+                          </span>
                           <span>·</span>
                           <span>{item.fileSize || '1.8 MB'}</span>
                         </div>
@@ -796,6 +812,117 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     placeholder="যেমন: Facebook Reel, YouTube Thumbnail"
                     className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none"
                   />
+                </div>
+              </div>
+
+              {/* Custom Upload Date Section */}
+              <div className="rounded-xl border border-indigo-900/60 bg-gradient-to-br from-indigo-950/40 via-slate-900 to-slate-950 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-white uppercase tracking-wider">
+                        {language === 'bn' ? 'আপলোডের তারিখ নির্ধারণ করুন (Upload Date)' : 'Custom Upload Date'}
+                      </label>
+                      <p className="text-[11px] text-slate-400">
+                        {language === 'bn'
+                          ? 'আপনার ইচ্ছামতো যেকোনো তারিখ বেছে নিন। ইউজার বা অডিয়েন্সের সামনে ঠিক এই ডেটটাই শো করবে।'
+                          : 'Set custom date of upload. Audience will see this date on the thumbnail.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center pt-1">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                      {language === 'bn' ? 'ক্যালেন্ডার থেকে তারিখ নির্বাচন করুন:' : 'Select date from calendar:'}
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={createdAtInput}
+                      onChange={(e) => setCreatedAtInput(e.target.value)}
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none cursor-pointer [color-scheme:dark]"
+                    />
+                  </div>
+
+                  {/* Quick Preset Buttons */}
+                  <div>
+                    <span className="block text-[11px] font-medium text-slate-400 mb-1">
+                      {language === 'bn' ? 'দ্রুত তারিখ বাছাই (Quick Select):' : 'Quick select shortcuts:'}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setCreatedAtInput(getTodayDateString())}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          createdAtInput === getTodayDateString()
+                            ? 'border-indigo-500 bg-indigo-600/40 text-indigo-300 font-semibold shadow-sm'
+                            : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {language === 'bn' ? '📅 আজ' : 'Today'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreatedAtInput(getDateOffsetDays(-1))}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          createdAtInput === getDateOffsetDays(-1)
+                            ? 'border-indigo-500 bg-indigo-600/40 text-indigo-300 font-semibold shadow-sm'
+                            : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {language === 'bn' ? 'গতকাল' : 'Yesterday'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreatedAtInput(getDateOffsetDays(-3))}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          createdAtInput === getDateOffsetDays(-3)
+                            ? 'border-indigo-500 bg-indigo-600/40 text-indigo-300 font-semibold shadow-sm'
+                            : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {language === 'bn' ? '৩ দিন আগে' : '3d ago'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreatedAtInput(getDateOffsetDays(-7))}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          createdAtInput === getDateOffsetDays(-7)
+                            ? 'border-indigo-500 bg-indigo-600/40 text-indigo-300 font-semibold shadow-sm'
+                            : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {language === 'bn' ? '১ সপ্তাহ আগে' : '1w ago'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCreatedAtInput(getDateOffsetDays(-30))}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          createdAtInput === getDateOffsetDays(-30)
+                            ? 'border-indigo-500 bg-indigo-600/40 text-indigo-300 font-semibold shadow-sm'
+                            : 'border-slate-800 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {language === 'bn' ? '১ মাস আগে' : '1m ago'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Preview of formatted date */}
+                <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-300 bg-slate-950/80 rounded-xl p-2.5 border border-slate-800/80">
+                  <span className="text-slate-400 font-medium">
+                    {language === 'bn' ? '👁️ অডিয়েন্সদের সামনে এভাবে শো করবে:' : '👁️ Audience display preview:'}
+                  </span>
+                  <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                    {formatDateWithRelative(createdAtInput, language)}
+                  </span>
                 </div>
               </div>
 

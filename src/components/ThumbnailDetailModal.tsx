@@ -9,8 +9,13 @@ import {
   Bookmark, 
   Sparkles,
   ShieldCheck,
-  Maximize2
+  Maximize2,
+  Calendar
 } from 'lucide-react';
+import { 
+  formatDisplayDate, 
+  formatDateWithRelative 
+} from '../utils/dateFormatter';
 import { 
   copyToClipboard, 
   downloadImage, 
@@ -117,12 +122,15 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
       >
         {/* Top Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/40">
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
             <span className="font-semibold text-indigo-400">{item.category}</span>
             <span aria-hidden="true">·</span>
             <span className="font-mono text-slate-200">{item.resolution}</span>
             <span aria-hidden="true">·</span>
-            <span>{item.createdAt}</span>
+            <span className="flex items-center gap-1 text-slate-300 font-medium">
+              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{formatDisplayDate(item.createdAt, language)}</span>
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -182,6 +190,29 @@ export const ThumbnailDetailModal: React.FC<ThumbnailDetailModalProps> = ({
 
         {/* Content Body */}
         <div className="p-6 sm:p-8 space-y-6">
+          {/* Metadata Highlights Bar */}
+          <div className="flex flex-wrap items-center gap-3 p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs">
+            <div className="flex items-center gap-1.5 text-indigo-300 font-medium">
+              <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
+              <span className="text-slate-400">{language === 'bn' ? 'আপলোডের তারিখ:' : 'Upload Date:'}</span>
+              <span className="font-semibold text-white">{formatDateWithRelative(item.createdAt, language)}</span>
+            </div>
+            <span className="text-slate-700 hidden sm:inline" aria-hidden="true">|</span>
+            <div className="flex items-center gap-1.5 text-slate-300">
+              <span className="text-slate-400">{language === 'bn' ? 'সাইজ:' : 'Dimensions:'}</span>
+              <span className="font-mono text-white">{item.resolution}</span>
+            </div>
+            {item.fileSize && (
+              <>
+                <span className="text-slate-700 hidden sm:inline" aria-hidden="true">|</span>
+                <div className="flex items-center gap-1.5 text-slate-300">
+                  <span className="text-slate-400">{language === 'bn' ? 'ফাইল সাইজ:' : 'File Size:'}</span>
+                  <span className="font-mono text-white">{item.fileSize}</span>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Title Section */}
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-4">
